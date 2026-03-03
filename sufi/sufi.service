@@ -1,0 +1,15 @@
+[Unit]
+Description=Sufi screen companion
+After=graphical.target
+
+[Service]
+Type=simple
+User=pi
+Environment=DISPLAY=:0
+WorkingDirectory=/home/pi/fathers-and-daughters/sufi
+ExecStart=/usr/bin/python3 /home/pi/fathers-and-daughters/sufi/main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
