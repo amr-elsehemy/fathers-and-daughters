@@ -1,7 +1,7 @@
-# Python 3.11 (Raspberry Pi OS Bookworm default)
+# Python 3.13
 
 # ── core ─────────────────────────────────────────────────────────
-pygame>=2.1.0,<3.0
+pygame>=2.6.0,<3.0        # 2.6.0 = first release with Python 3.13 wheels
 python-dotenv>=1.0.0
 
 # ── AI modes ─────────────────────────────────────────────────────
@@ -9,6 +9,8 @@ openai>=1.0.0
 requests>=2.31.0          # realtime session creation
 
 # ── speech modes (text_voice / speech_speech) ────────────────────
-# On Pi: sudo apt install portaudio19-dev python3-pyaudio -y
-pyaudio>=0.2.13
-websockets>=12.0          # speech_speech realtime WebSocket
+# On Pi: sudo apt install portaudio19-dev -y  (then pip install pyaudio)
+# Note: 'python3-pyaudio' apt package may be tied to the system Python,
+#       use pip to ensure it installs against Python 3.13
+pyaudio>=0.2.14           # 0.2.14 = first release with Python 3.13 support
+websockets>=13.0          # 13.x has stable Python 3.13 support

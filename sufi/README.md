@@ -29,11 +29,14 @@ Sufi lives on a small screen and expresses herself through animated eyes and smi
 ## Setup
 
 ```bash
-# System packages (Pi)
+# System packages (Pi) — portaudio is needed to build pyaudio
 sudo apt update
-sudo apt install python3-pygame portaudio19-dev python3-pyaudio -y
+sudo apt install portaudio19-dev -y
+# Note: avoid 'python3-pygame' and 'python3-pyaudio' from apt —
+#       they link to the system Python, not Python 3.13.
+#       Use pip instead (below).
 
-# Python deps
+# Python deps (against Python 3.13)
 cd fathers-and-daughters/sufi
 pip install -r requirements.txt
 
