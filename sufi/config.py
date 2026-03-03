@@ -1,8 +1,24 @@
 # sufi — configuration
 
-SCREEN_WIDTH  = 480
-SCREEN_HEIGHT = 320
-FULLSCREEN    = True
+import platform_detect as _pd
+
+# ── platform profiles ─────────────────────────────────────────────────────────
+# Override by setting SUFI_PLATFORM in .env:
+#   windows | pi_zero | pi4 | linux
+_PROFILES = {
+    "windows": dict(SCREEN_WIDTH=800,  SCREEN_HEIGHT=520,  FULLSCREEN=False, CURSOR_VISIBLE=True),
+    "pi_zero": dict(SCREEN_WIDTH=480,  SCREEN_HEIGHT=320,  FULLSCREEN=True,  CURSOR_VISIBLE=False),
+    "pi4":     dict(SCREEN_WIDTH=1280, SCREEN_HEIGHT=720,  FULLSCREEN=True,  CURSOR_VISIBLE=False),
+    "linux":   dict(SCREEN_WIDTH=800,  SCREEN_HEIGHT=520,  FULLSCREEN=False, CURSOR_VISIBLE=True),
+}
+
+PLATFORM      = _pd.detect()
+_profile      = _PROFILES.get(PLATFORM, _PROFILES["linux"])
+
+SCREEN_WIDTH   = _profile["SCREEN_WIDTH"]
+SCREEN_HEIGHT  = _profile["SCREEN_HEIGHT"]
+FULLSCREEN     = _profile["FULLSCREEN"]
+CURSOR_VISIBLE = _profile["CURSOR_VISIBLE"]
 
 # Colors
 BG_COLOR      = (20, 20, 30)       # dark background

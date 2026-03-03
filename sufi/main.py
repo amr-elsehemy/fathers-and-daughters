@@ -283,7 +283,7 @@ def main():
     flags = pygame.FULLSCREEN if cfg.FULLSCREEN else 0
     screen = pygame.display.set_mode((cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), flags)
     pygame.display.set_caption("sufi")
-    pygame.mouse.set_visible(False)
+    pygame.mouse.set_visible(cfg.CURSOR_VISIBLE)
 
     clock = pygame.time.Clock()
     sufi  = Sufi(screen)
