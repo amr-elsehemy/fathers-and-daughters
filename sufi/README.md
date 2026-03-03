@@ -29,15 +29,16 @@ Sufi lives on a small screen and expresses herself through animated eyes and smi
 ## Setup
 
 ```bash
-# System packages (Pi) — portaudio is needed to build pyaudio
+# System packages (Pi) — portaudio C library needed to build pyaudio
 sudo apt update
-sudo apt install portaudio19-dev -y
-# Note: avoid 'python3-pygame' and 'python3-pyaudio' from apt —
-#       they link to the system Python, not Python 3.13.
-#       Use pip instead (below).
+sudo apt install portaudio19-dev python3-full -y
 
-# Python deps (against Python 3.13)
+# Create a virtual environment (required on Raspberry Pi OS Bookworm+)
 cd fathers-and-daughters/sufi
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install Python deps inside the venv
 pip install -r requirements.txt
 
 # Config
@@ -48,8 +49,9 @@ nano .env          # add OPENAI_API_KEY and set SUFI_MODE
 ### Run
 
 ```bash
-python3 main.py        # face only, no AI
-python3 sufi_ai.py     # AI mode (reads SUFI_MODE from .env)
+source .venv/bin/activate
+python main.py        # face only, no AI
+python sufi_ai.py     # AI mode (reads SUFI_MODE from .env)
 ```
 
 ### Auto-start on boot
