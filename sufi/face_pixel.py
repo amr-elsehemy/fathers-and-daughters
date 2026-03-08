@@ -14,6 +14,7 @@ idle      → happy face; right eye shows a pink heart
 listening → both eyes show white pupil (heart gone); attentive
 thinking  → thought bubble appears in top-right corner
 speaking  → mouth alternates between smile and open shape
+sleepy    → heavy drooping eyelids, tiny relaxed mouth
 """
 
 import math
@@ -66,6 +67,21 @@ _MOUTH_OPEN = frozenset([
     (0, -2), (0, -1), (0,  0), (0,  1), (0,  2),
     (1, -2),                             (1,  2),
     (2, -1), (2,  0), (2,  1),
+])
+
+# Sleepy eye: heavy drooping lid (top 3 rows covered, only bottom arc visible)
+_EYE_SLEEPY = frozenset([
+    ( 0, -2), ( 0,  2),           # narrow opening, just the sides
+    ( 1, -2),          ( 1,  2),
+    ( 2, -1), ( 2,  0), ( 2,  1), # bottom arc
+    # drooping lid bar sits one row above center
+    (-1, -2), (-1, -1), (-1,  0), (-1,  1), (-1,  2),
+])
+
+# Tiny relaxed mouth (sleepy state — barely smiling)
+_MOUTH_TINY = frozenset([
+    (1, -1), (1,  1),
+    (2,  0),
 ])
 
 # Thought bubble: cloud body + 3 trailing dots (shown during "thinking")
@@ -214,12 +230,16 @@ class PixelFace:
         C  = self._C
         po = self._pupil_offset
 
+        sleepy = self._state == "sleepy"
+
         # ── eyes ─────────────────────────────────────────────────────────────
         for side in ("left", "right"):
             ex    = self._lx if side == "left" else self._rx
             bprog = self._blink_l if side == "left" else self._blink_r
 
-            if bprog > 0.5:
+            if sleepy:
+                _draw_shape(self.surface, _EYE_SLEEPY, ex, self._ey, C, self._eye_c)
+            elif bprog > 0.5:
                 # Closed: single horizontal bar
                 _draw_shape(self.surface, _EYE_BLINK, ex, self._ey, C, self._eye_c)
             else:
@@ -239,9 +259,13 @@ class PixelFace:
                     _draw_shape(self.surface, _HIGHLIGHT, pcx, pcy, C, self._hlt_c)
 
         # ── mouth ─────────────────────────────────────────────────────────────
-        _draw_shape(self.surface,
-                    _MOUTH_OPEN if self._mouth_open else _MOUTH_SMILE,
-                    self._mx, self._my, C, self._eye_c)
+        if sleepy:
+            mouth = _MOUTH_TINY
+        elif self._mouth_open:
+            mouth = _MOUTH_OPEN
+        else:
+            mouth = _MOUTH_SMILE
+        _draw_shape(self.surface, mouth, self._mx, self._my, C, self._eye_c)
 
         # ── thought bubble (thinking state only) ─────────────────────────────
         if self._state == "thinking":
