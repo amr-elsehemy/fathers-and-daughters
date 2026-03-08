@@ -71,7 +71,8 @@ class SpeechSpeechMode:
         self.api_key   = os.environ["OPENAI_API_KEY"]
         self._running  = False
         self._thread   = None
-        self._speaking = False   # True while AI audio is playing; mic is muted
+        self._speaking     = False   # True while AI audio is playing; mic is muted
+        self._force_sleepy = False   # True after sleep keyword; persists across response cycle
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -146,6 +147,7 @@ class SpeechSpeechMode:
                 "modalities":          ["audio", "text"],
                 "input_audio_format":  "pcm16",
                 "output_audio_format": "pcm16",
+                "input_audio_transcription": {"model": "whisper-1"},
                 "turn_detection": {
                     "type":                "server_vad",
                     "threshold":           0.4,
@@ -268,8 +270,19 @@ class SpeechSpeechMode:
                 log.debug("session.created — session is ready")
                 session_ready.set()
 
+            elif t == "conversation.item.input_audio_transcription.completed":
+                transcript = ev.get("transcript", "").lower()
+                log.debug("user said: %s", transcript)
+                _SLEEP_WORDS = ("sleep", "sleepy", "tired", "goodnight",
+                                "good night", "nap", "rest", "bedtime")
+                if any(w in transcript for w in _SLEEP_WORDS):
+                    log.debug("sleep keyword detected → sleepy state")
+                    self._force_sleepy = True
+                    self.on_state("sleepy")
+
             elif t == "input_audio_buffer.speech_started":
                 log.debug("speech started")
+                self._force_sleepy = False   # user spoke → wake up
                 self.on_state("listening")
 
             elif t == "input_audio_buffer.speech_stopped":
@@ -286,7 +299,7 @@ class SpeechSpeechMode:
             elif t == "response.done":
                 log.debug("response.done")
                 self._speaking = False
-                self.on_state("listening")
+                self.on_state("sleepy" if self._force_sleepy else "listening")
 
             elif t == "error":
                 log.error("server error event: %s", json.dumps(ev))
