@@ -68,9 +68,10 @@ class SpeechSpeechMode:
     def __init__(self, on_state, on_error):
         self.on_state = on_state
         self.on_error = on_error
-        self.api_key  = os.environ["OPENAI_API_KEY"]
-        self._running = False
-        self._thread  = None
+        self.api_key   = os.environ["OPENAI_API_KEY"]
+        self._running  = False
+        self._thread   = None
+        self._speaking = False   # True while AI audio is playing; mic is muted
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -149,7 +150,7 @@ class SpeechSpeechMode:
                     "type":                "server_vad",
                     "threshold":           0.4,
                     "prefix_padding_ms":   400,
-                    "silence_duration_ms": 1200,
+                    "silence_duration_ms": 1800,
                 },
             },
         }
@@ -209,6 +210,8 @@ class SpeechSpeechMode:
         ):
             while self._running:
                 chunk = await mic_queue.get()
+                if self._speaking:
+                    continue   # discard mic audio while AI is talking (prevents echo triggers)
                 await ws.send(json.dumps({
                     "type":  "input_audio_buffer.append",
                     "audio": base64.b64encode(chunk).decode(),
@@ -276,11 +279,13 @@ class SpeechSpeechMode:
             elif t in ("response.output_audio.delta", "response.audio.delta"):
                 delta = ev.get("delta")
                 if delta:
+                    self._speaking = True
                     await audio_queue.put(base64.b64decode(delta))
                     self.on_state("speaking")
 
             elif t == "response.done":
                 log.debug("response.done")
+                self._speaking = False
                 self.on_state("listening")
 
             elif t == "error":
