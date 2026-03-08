@@ -1,5 +1,6 @@
 # sufi — configuration
 
+import os
 import platform_detect as _pd
 
 # ── platform profiles ─────────────────────────────────────────────────────────
@@ -52,3 +53,13 @@ EXPRESSION_INTERVAL_MAX = 20.0
 EXPRESSION_DURATION     = 3.0
 
 FPS = 60
+
+# ── face style ────────────────────────────────────────────────────────────────
+# Set SUFI_FACE=pixel in .env to use the pixel-art face; default is classic.
+FACE_STYLE = os.getenv("SUFI_FACE", "classic").strip().lower()
+
+# ── pixel face colors ─────────────────────────────────────────────────────────
+PIXEL_EYE_COLOR    = (0,   220, 220)   # cyan — eye outlines and mouth
+PIXEL_PUPIL_COLOR  = (255, 255, 255)   # white pupil dot
+PIXEL_HEART_COLOR  = (230,  80, 170)   # pink heart (right eye, idle state)
+PIXEL_BUBBLE_COLOR = (230, 235, 255)   # soft white thought bubble

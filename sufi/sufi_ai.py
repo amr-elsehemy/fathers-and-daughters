@@ -20,6 +20,15 @@ import config as cfg
 
 MODE = os.getenv("SUFI_MODE", "text_chat")
 
+
+def _make_face(surface: pygame.Surface):
+    """Return a PixelFace or classic Sufi depending on SUFI_FACE in .env."""
+    if cfg.FACE_STYLE == "pixel":
+        from face_pixel import PixelFace
+        return PixelFace(surface)
+    from main import Sufi
+    return Sufi(surface)
+
 # ── layout ───────────────────────────────────────────────────────────────────
 INPUT_H   = 42
 RESP_H    = 90
@@ -108,12 +117,10 @@ def draw_wrapped(surface: pygame.Surface, text: str,
 # ─────────────────────────────────────────────────────────────────────────────
 
 def run_text_mode(screen: pygame.Surface, mode_name: str):
-    from main import Sufi
-
     W, H   = screen.get_size()
     face_h = H - PANEL_H
     face_surf = screen.subsurface(pygame.Rect(0, 0, W, face_h))
-    sufi      = Sufi(face_surf)
+    sufi      = _make_face(face_surf)
 
     if mode_name == "text_chat":
         from modes.text_chat  import TextChatMode  as Mode
@@ -187,14 +194,15 @@ def run_text_mode(screen: pygame.Surface, mode_name: str):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def run_speech_mode(screen: pygame.Surface):
-    from main import Sufi
     from modes.speech_speech import SpeechSpeechMode
 
-    sufi  = Sufi(screen)
+    sufi  = _make_face(screen)
     state = {"value": "idle"}
 
     def on_state(s):
         state["value"] = s
+        if hasattr(sufi, "set_state"):
+            sufi.set_state(s)
 
     def on_error(e):
         state["value"] = f"error: {e}"
