@@ -10,4 +10,5 @@ openai>=1.0.0
 # ── speech modes (text_voice / speech_speech) ────────────────────
 # On Pi: sudo apt install libportaudio2 -y  (then pip install sounddevice)
 sounddevice>=0.4.6        # uses PortAudio; cleaner than pyaudio for streaming
+numpy>=1.26.0             # mic resampling (device native rate → 24 kHz)
 websockets>=13.0          # 13.x has stable Python 3.13 support

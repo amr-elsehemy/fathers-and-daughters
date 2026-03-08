@@ -28,6 +28,7 @@ import logging
 import os
 import threading
 
+import numpy as np
 import sounddevice as sd
 import websockets
 
@@ -172,27 +173,38 @@ class SpeechSpeechMode:
         loop      = asyncio.get_event_loop()
         mic_queue: asyncio.Queue = asyncio.Queue()
 
-        def callback(indata: bytes, frames: int, time, status):
-            if status:
-                pass  # overflow/underflow — not fatal, just skip
-            loop.call_soon_threadsafe(mic_queue.put_nowait, bytes(indata))
-
         # Find the USB mic automatically (falls back to system default if absent)
         usb_input = next(
             (i for i, d in enumerate(sd.query_devices())
              if d["max_input_channels"] > 0 and "USB" in d["name"]),
             None,
         )
-        log.debug("mic device: %s (%s)", usb_input,
-                  sd.query_devices(usb_input)["name"] if usb_input is not None
-                  else "system default")
+        device_info  = sd.query_devices(usb_input, "input")
+        capture_rate = int(device_info["default_samplerate"])  # e.g. 48000
+        # Blocksize scaled to capture rate so each chunk = BLOCK_MS ms of audio
+        capture_blocksize = SAMPLE_RATE * BLOCK_MS // 1000 * capture_rate // SAMPLE_RATE
+        log.debug("mic device: %s (%s) native=%d Hz",
+                  usb_input, device_info["name"], capture_rate)
+
+        def callback(indata: bytes, frames: int, time, status):
+            if status:
+                pass  # overflow/underflow — not fatal, just skip
+            # Resample from capture_rate → SAMPLE_RATE (e.g. 48000 → 24000)
+            samples   = np.frombuffer(indata, dtype=np.int16).astype(np.float32)
+            n_out     = int(len(samples) * SAMPLE_RATE / capture_rate)
+            resampled = np.interp(
+                np.linspace(0, len(samples) - 1, n_out),
+                np.arange(len(samples)),
+                samples,
+            ).astype(np.int16)
+            loop.call_soon_threadsafe(mic_queue.put_nowait, resampled.tobytes())
 
         with sd.RawInputStream(
             device=usb_input,
-            samplerate=SAMPLE_RATE,
+            samplerate=capture_rate,
             channels=CHANNELS,
             dtype=DTYPE,
-            blocksize=BLOCKSIZE,
+            blocksize=capture_blocksize,
             callback=callback,
         ):
             while self._running:
