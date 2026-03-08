@@ -73,6 +73,7 @@ class SpeechSpeechMode:
         self._thread   = None
         self._speaking     = False   # True while AI audio is playing; mic is muted
         self._force_sleepy = False   # True after sleep keyword; persists across response cycle
+        self._cancel_sent  = False   # True after we've sent response.cancel for current response
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -273,32 +274,46 @@ class SpeechSpeechMode:
             elif t == "conversation.item.input_audio_transcription.completed":
                 transcript = ev.get("transcript", "").lower()
                 log.debug("user said: %s", transcript)
+                _WAKE_WORDS  = ("wake up", "wake", "wakey")
                 _SLEEP_WORDS = ("sleep", "sleepy", "tired", "goodnight",
                                 "good night", "nap", "rest", "bedtime")
-                if any(w in transcript for w in _SLEEP_WORDS):
+                if self._force_sleepy and any(w in transcript for w in _WAKE_WORDS):
+                    log.debug("wake keyword detected → listening state")
+                    self._force_sleepy = False
+                    self._cancel_sent  = False
+                    self.on_state("listening")
+                elif not self._force_sleepy and any(w in transcript for w in _SLEEP_WORDS):
                     log.debug("sleep keyword detected → sleepy state")
                     self._force_sleepy = True
                     self.on_state("sleepy")
 
             elif t == "input_audio_buffer.speech_started":
                 log.debug("speech started")
-                self._force_sleepy = False   # user spoke → wake up
-                self.on_state("listening")
+                if not self._force_sleepy:
+                    self.on_state("listening")
 
             elif t == "input_audio_buffer.speech_stopped":
                 log.debug("speech stopped")
-                self.on_state("thinking")
+                if not self._force_sleepy:
+                    self.on_state("thinking")
 
             elif t in ("response.output_audio.delta", "response.audio.delta"):
-                delta = ev.get("delta")
-                if delta:
-                    self._speaking = True
-                    await audio_queue.put(base64.b64decode(delta))
-                    self.on_state("speaking")
+                if self._force_sleepy:
+                    if not self._cancel_sent:
+                        log.debug("sleepy — cancelling response")
+                        await ws.send(json.dumps({"type": "response.cancel"}))
+                        self._cancel_sent = True
+                else:
+                    delta = ev.get("delta")
+                    if delta:
+                        self._speaking = True
+                        await audio_queue.put(base64.b64decode(delta))
+                        self.on_state("speaking")
 
             elif t == "response.done":
                 log.debug("response.done")
-                self._speaking = False
+                self._speaking   = False
+                self._cancel_sent = False
                 self.on_state("sleepy" if self._force_sleepy else "listening")
 
             elif t == "error":
