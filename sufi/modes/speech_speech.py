@@ -177,7 +177,18 @@ class SpeechSpeechMode:
                 pass  # overflow/underflow — not fatal, just skip
             loop.call_soon_threadsafe(mic_queue.put_nowait, bytes(indata))
 
+        # Find the USB mic automatically (falls back to system default if absent)
+        usb_input = next(
+            (i for i, d in enumerate(sd.query_devices())
+             if d["max_input_channels"] > 0 and "USB" in d["name"]),
+            None,
+        )
+        log.debug("mic device: %s (%s)", usb_input,
+                  sd.query_devices(usb_input)["name"] if usb_input is not None
+                  else "system default")
+
         with sd.RawInputStream(
+            device=usb_input,
             samplerate=SAMPLE_RATE,
             channels=CHANNELS,
             dtype=DTYPE,
