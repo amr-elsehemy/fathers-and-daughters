@@ -28,6 +28,7 @@ import base64
 import json
 import logging
 import os
+import re
 import time
 import threading
 
@@ -60,13 +61,14 @@ PROMPT_IDS = {
 # ── session / connection tuning ───────────────────────────────────────────────
 IDLE_TIMEOUT_S       = 30     # seconds of no speech before going sleepy
 WAKE_CHECK_TIMEOUT_S = 10     # max seconds waiting for speech during wake-check
-WAKE_ENERGY_RMS      = 600    # int16 RMS level considered possible speech
-WAKE_DEBOUNCE_S      = 0.45   # sustained energy duration before triggering reconnect
-MIN_RECONNECT_GAP_S  = 3.0    # minimum seconds between wake-check reconnects
+WAKE_ENERGY_RMS      = 300    # int16 RMS level considered possible speech (lower = more sensitive)
+WAKE_DEBOUNCE_S      = 0.2    # sustained energy duration before triggering reconnect
+MIN_RECONNECT_GAP_S  = 1.5    # minimum seconds between wake-check reconnects
 
 # ── keyword lists (all lower-case, checked via substring match) ───────────────
+# Whisper may transcribe "wakeup" as one word or two — both variants included.
 WAKE_WORDS = frozenset([
-    "wake up", "wake", "wakey", "hamlet",
+    "wake up hamlet", "wakeup hamlet",
 ])
 SLEEP_WORDS = frozenset([
     "sleep", "sleepy", "tired", "goodnight", "good night",
@@ -97,11 +99,12 @@ class SpeechSpeechMode:
         self._thread      = None
 
         # session-level flags (safe to read from async tasks; written carefully)
-        self._speaking      = False   # True while AI audio is being played
-        self._cancel_sent   = False   # True after response.cancel sent this turn
-        self._force_sleepy  = False   # True when sleep keyword detected
-        self._just_woke     = False   # True on first normal session after wake
-        self._last_speech_t = 0.0     # monotonic time of last detected speech
+        self._speaking              = False   # True while AI audio is being played
+        self._cancel_sent           = False   # True after response.cancel sent this turn
+        self._force_sleepy          = False   # True when sleep keyword detected
+        self._just_woke             = False   # True on first normal session after wake
+        self._last_speech_t         = 0.0     # monotonic time of last detected speech
+        self._speaking_cooldown_until = 0.0   # mute mic briefly after AI stops (echo guard)
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -303,8 +306,8 @@ class SpeechSpeechMode:
                     chunk = await asyncio.wait_for(mic_q.get(), timeout=0.2)
                 except asyncio.TimeoutError:
                     continue
-                if self._speaking:
-                    continue   # mute mic while AI talks (prevents echo re-triggers)
+                if time.monotonic() < self._speaking_cooldown_until:
+                    continue   # brief post-speech cooldown (echo suppression)
                 try:
                     await ws.send(json.dumps({
                         "type":  "input_audio_buffer.append",
@@ -363,14 +366,37 @@ class SpeechSpeechMode:
 
                 # ── HIGHEST PRIORITY: keyword check on completed transcript ────
                 elif t == "conversation.item.input_audio_transcription.completed":
-                    transcript = ev.get("transcript", "").lower().strip()
-                    log.debug("heard: %r", transcript)
+                    raw = ev.get("transcript", "").lower().strip()
+                    # Strip punctuation so "wake up, hamlet." matches "wake up hamlet"
+                    transcript = re.sub(r"[^\w\s]", "", raw)
+                    log.debug("heard: %r (cleaned: %r)", raw, transcript)
                     self._handle_keywords(transcript, wake_check)
+                    # In wake-check mode, disconnect here — AFTER checking the
+                    # transcript — because response.done often arrives before
+                    # transcription completes and would close the session too early.
+                    if wake_check:
+                        stop_event.set()
+                        try:
+                            await ws.close()
+                        except Exception:
+                            pass
 
                 # ── speech activity (update idle timer) ───────────────────────
                 elif t == "input_audio_buffer.speech_started":
                     self._last_speech_t = time.monotonic()
-                    if not self._force_sleepy:
+                    if self._speaking and not self._cancel_sent and not self._force_sleepy:
+                        # User interrupted AI mid-response — cancel immediately
+                        log.debug("barge-in detected → cancelling AI response")
+                        self._speaking = False
+                        self._cancel_sent = True
+                        while not audio_queue.empty():
+                            audio_queue.get_nowait()
+                        try:
+                            await ws.send(json.dumps({"type": "response.cancel"}))
+                        except Exception:
+                            pass
+                        self.on_state("listening")
+                    elif not self._force_sleepy:
                         self.on_state("listening")
 
                 elif t == "input_audio_buffer.speech_stopped":
@@ -398,20 +424,16 @@ class SpeechSpeechMode:
 
                 # ── turn complete ──────────────────────────────────────────────
                 elif t == "response.done":
-                    self._speaking    = False
-                    self._cancel_sent = False
+                    self._speaking              = False
+                    self._cancel_sent           = False
+                    self._speaking_cooldown_until = time.monotonic() + 0.8
                     if self._force_sleepy:
                         self.on_state("sleepy")
                     else:
                         self.on_state("listening")
 
-                    # wake-check always disconnects after one turn
-                    if wake_check:
-                        stop_event.set()
-                        try:
-                            await ws.close()
-                        except Exception:
-                            pass
+                    # wake-check: transcript handler owns the disconnect;
+                    # watchdog covers the timeout case (no speech detected).
 
                 # ── server error ───────────────────────────────────────────────
                 elif t == "error":
