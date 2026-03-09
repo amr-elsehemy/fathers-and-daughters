@@ -6,9 +6,15 @@ Set SUFI_MODE in .env:
   text_voice     → type text, hear response as voice
   speech_speech  → speak to Sufi, hear her respond (Realtime API)
 
+Optional positional argument: path to a plain-text kid profile file.
+  python sufi_ai.py profiles/layla.txt
+The file may contain the child's name, age, interests, etc.  Its contents
+are injected as the AI system prompt so Sufi feels personalised.
+
 Press ESC / Q to quit.
 """
 
+import argparse
 import os
 import sys
 import pygame
@@ -116,7 +122,7 @@ def draw_wrapped(surface: pygame.Surface, text: str,
 # Text modes (text_chat / text_voice)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_text_mode(screen: pygame.Surface, mode_name: str):
+def run_text_mode(screen: pygame.Surface, mode_name: str, profile_text: str = ""):
     W, H   = screen.get_size()
     face_h = H - PANEL_H
     face_surf = screen.subsurface(pygame.Rect(0, 0, W, face_h))
@@ -138,7 +144,7 @@ def run_text_mode(screen: pygame.Surface, mode_name: str):
         response["text"] = f"[!] {err}"
         response["busy"] = False
 
-    ai   = Mode(on_response, on_error)
+    ai   = Mode(on_response, on_error, profile_text=profile_text)
     font = pygame.font.SysFont("monospace", FONT_SIZE)
 
     input_rect = pygame.Rect(PAD, face_h + PAD,           W - PAD * 2, INPUT_H)
@@ -193,7 +199,8 @@ def run_text_mode(screen: pygame.Surface, mode_name: str):
 # Speech-to-speech mode
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_speech_mode(screen: pygame.Surface):
+def run_speech_mode(screen: pygame.Surface, profile_text: str = "",
+                    speaker: str = "daughter"):
     from modes.speech_speech import SpeechSpeechMode
 
     sufi  = _make_face(screen)
@@ -207,7 +214,8 @@ def run_speech_mode(screen: pygame.Surface):
     def on_error(e):
         state["value"] = f"error: {e}"
 
-    ai    = SpeechSpeechMode(on_state, on_error)
+    ai    = SpeechSpeechMode(on_state, on_error, profile_text=profile_text,
+                             speaker=speaker)
     font  = pygame.font.SysFont("monospace", 19)
     W, H  = screen.get_size()
     clock = pygame.time.Clock()
@@ -242,6 +250,29 @@ def run_speech_mode(screen: pygame.Surface):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main():
+    parser = argparse.ArgumentParser(description="Sufi AI companion")
+    parser.add_argument(
+        "profile", nargs="?", metavar="PROFILE_FILE",
+        help="Optional path to a plain-text kid profile file "
+             "(name, age, interests, etc.).  Injected as the AI system prompt.",
+    )
+    parser.add_argument(
+        "--speaker", choices=["father", "daughter", "both"],
+        default="daughter",
+        help="Who is talking to the bot (selects the AI prompt). "
+             "father=adult-only, daughter/both=child-present (default: daughter).",
+    )
+    args = parser.parse_args()
+
+    profile_text = ""
+    if args.profile:
+        try:
+            with open(args.profile, "r", encoding="utf-8") as f:
+                profile_text = f.read().strip()
+            print(f"[sufi] loaded profile: {args.profile} ({len(profile_text)} chars)")
+        except OSError as e:
+            print(f"[sufi] WARNING: could not read profile file: {e}")
+
     pygame.init()
     flags  = pygame.FULLSCREEN if cfg.FULLSCREEN else 0
     screen = pygame.display.set_mode((cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), flags)
@@ -249,9 +280,9 @@ def main():
     pygame.mouse.set_visible(cfg.CURSOR_VISIBLE)
 
     if MODE == "speech_speech":
-        run_speech_mode(screen)
+        run_speech_mode(screen, profile_text, args.speaker)
     elif MODE in ("text_chat", "text_voice"):
-        run_text_mode(screen, MODE)
+        run_text_mode(screen, MODE, profile_text)
     else:
         print(f"Unknown SUFI_MODE: {MODE!r}")
         print("Valid options: text_chat | text_voice | speech_speech")

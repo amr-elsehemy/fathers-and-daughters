@@ -12,11 +12,12 @@ from openai import OpenAI
 
 
 class TextVoiceMode:
-    def __init__(self, on_response, on_error):
-        self.client      = OpenAI()   # reads OPENAI_API_KEY from env
-        self.on_response = on_response
-        self.on_error    = on_error
-        self.busy        = False
+    def __init__(self, on_response, on_error, profile_text: str = ""):
+        self.client       = OpenAI()   # reads OPENAI_API_KEY from env
+        self.on_response  = on_response
+        self.on_error     = on_error
+        self.profile_text = profile_text
+        self.busy         = False
         pygame.mixer.init()
 
     def submit(self, text: str):
@@ -29,9 +30,13 @@ class TextVoiceMode:
         tmp = None
         try:
             # 1. Chat response
+            messages = []
+            if self.profile_text:
+                messages.append({"role": "system", "content": self.profile_text})
+            messages.append({"role": "user", "content": text})
             resp = self.client.chat.completions.create(
                 model="gpt-4o",
-                messages=[{"role": "user", "content": text}],
+                messages=messages,
                 max_tokens=200,
             )
             reply = resp.choices[0].message.content.strip()
