@@ -58,6 +58,9 @@ FPS = 60
 # Set SUFI_FACE=pixel in .env to use the pixel-art face; default is classic.
 FACE_STYLE = os.getenv("SUFI_FACE", "classic").strip().lower()
 
+# ── speech_speech options ─────────────────────────────────────────────────────
+BARGE_IN_ENABLED = False    # set False to disable barge-in (user speech never interrupts AI)
+
 # ── pixel face colors ─────────────────────────────────────────────────────────
 PIXEL_EYE_COLOR    = (0,   220, 220)   # cyan — eye outlines and mouth
 PIXEL_PUPIL_COLOR  = (255, 255, 255)   # white pupil dot

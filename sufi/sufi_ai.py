@@ -122,7 +122,8 @@ def draw_wrapped(surface: pygame.Surface, text: str,
 # Text modes (text_chat / text_voice)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_text_mode(screen: pygame.Surface, mode_name: str, profile_text: str = ""):
+def run_text_mode(screen: pygame.Surface, mode_name: str, profile_text: str = "",
+                  inverted: bool = False):
     W, H   = screen.get_size()
     face_h = H - PANEL_H
     face_surf = screen.subsurface(pygame.Rect(0, 0, W, face_h))
@@ -189,6 +190,8 @@ def run_text_mode(screen: pygame.Surface, mode_name: str, profile_text: str = ""
         badge = font.render(mode_name.replace("_", " "), True, (60, 60, 80))
         screen.blit(badge, (W - badge.get_width() - 6, 4))
 
+        if inverted:
+            screen.blit(pygame.transform.flip(screen, False, True), (0, 0))
         pygame.display.flip()
         clock.tick(cfg.FPS)
 
@@ -200,7 +203,7 @@ def run_text_mode(screen: pygame.Surface, mode_name: str, profile_text: str = ""
 # ─────────────────────────────────────────────────────────────────────────────
 
 def run_speech_mode(screen: pygame.Surface, profile_text: str = "",
-                    speaker: str = "daughter"):
+                    speaker: str = "daughter", inverted: bool = False):
     from modes.speech_speech import SpeechSpeechMode
 
     sufi  = _make_face(screen)
@@ -239,6 +242,8 @@ def run_speech_mode(screen: pygame.Surface, profile_text: str = "",
         label = font.render(f"● {s}", True, color)
         screen.blit(label, (W - label.get_width() - 10, H - label.get_height() - 8))
 
+        if inverted:
+            screen.blit(pygame.transform.flip(screen, False, True), (0, 0))
         pygame.display.flip()
         clock.tick(cfg.FPS)
 
@@ -262,6 +267,10 @@ def main():
         help="Who is talking to the bot (selects the AI prompt). "
              "father=adult-only, daughter/both=child-present (default: daughter).",
     )
+    parser.add_argument(
+        "--flip", action="store_true",
+        help="Flip the display vertically (for upside-down screen mounting).",
+    )
     args = parser.parse_args()
 
     profile_text = ""
@@ -280,9 +289,9 @@ def main():
     pygame.mouse.set_visible(cfg.CURSOR_VISIBLE)
 
     if MODE == "speech_speech":
-        run_speech_mode(screen, profile_text, args.speaker)
+        run_speech_mode(screen, profile_text, args.speaker, inverted=args.flip)
     elif MODE in ("text_chat", "text_voice"):
-        run_text_mode(screen, MODE, profile_text)
+        run_text_mode(screen, MODE, profile_text, inverted=args.flip)
     else:
         print(f"Unknown SUFI_MODE: {MODE!r}")
         print("Valid options: text_chat | text_voice | speech_speech")

@@ -36,6 +36,8 @@ import numpy as np
 import sounddevice as sd
 import websockets
 
+import config as cfg
+
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG, format="[%(levelname)s] %(name)s: %(message)s")
 
@@ -384,7 +386,10 @@ class SpeechSpeechMode:
                 # ── speech activity (update idle timer) ───────────────────────
                 elif t == "input_audio_buffer.speech_started":
                     self._last_speech_t = time.monotonic()
-                    if self._speaking and not self._cancel_sent and not self._force_sleepy:
+                    if (cfg.BARGE_IN_ENABLED
+                            and self._speaking
+                            and not self._cancel_sent
+                            and not self._force_sleepy):
                         # User interrupted AI mid-response — cancel immediately
                         log.debug("barge-in detected → cancelling AI response")
                         self._speaking = False
