@@ -60,6 +60,7 @@ FACE_STYLE = os.getenv("SUFI_FACE", "classic").strip().lower()
 
 # ── speech_speech options ─────────────────────────────────────────────────────
 BARGE_IN_ENABLED = False    # set False to disable barge-in (user speech never interrupts AI)
+SLEEP_MODE_ENABLED = False  # set True to enable sleep/wake keyword detection
 
 # ── pixel face colors ─────────────────────────────────────────────────────────
 PIXEL_EYE_COLOR    = (0,   220, 220)   # cyan — eye outlines and mouth

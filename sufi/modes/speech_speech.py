@@ -265,7 +265,10 @@ class SpeechSpeechMode:
             await asyncio.sleep(1)
             elapsed = time.monotonic() - self._last_speech_t
 
-            if not wake_check and not self._force_sleepy and elapsed > IDLE_TIMEOUT_S:
+            if (cfg.SLEEP_MODE_ENABLED
+                    and not wake_check
+                    and not self._force_sleepy
+                    and elapsed > IDLE_TIMEOUT_S):
                 log.debug("idle timeout (%ds) → sleepy", IDLE_TIMEOUT_S)
                 self._force_sleepy = True
                 self.on_state("sleepy")
@@ -470,7 +473,9 @@ class SpeechSpeechMode:
             return
 
         # Sleep word: go to sleep immediately (suppress current response)
-        if not self._force_sleepy and any(w in transcript for w in SLEEP_WORDS):
+        if (cfg.SLEEP_MODE_ENABLED
+                and not self._force_sleepy
+                and any(w in transcript for w in SLEEP_WORDS)):
             log.debug("SLEEP keyword detected → sleeping")
             self._force_sleepy = True
             self._cancel_sent  = False
